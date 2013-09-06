@@ -32,6 +32,12 @@ stop() ->
   exit(whereis(rudy), "time to die").
 
 server_start(Port, ServerNode, WorkerNode) ->
+  if WorkerNode =/= false ->
+    io:format("Ping worker ~p: ~p~n", [WorkerNode, net_adm:ping(WorkerNode)]),
+    io:format("Reloading code: ~p (~p)~n", [[c:nl(rudy), c:nl(http)], nodes()]);
+  true ->
+    0
+  end,
   {ok, ServerSock} = gen_tcp:listen(Port, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]),
   io:format("Listening for connections on ~p...~n", [Port]),
   server_accept(ServerSock, ServerNode, WorkerNode).
@@ -49,8 +55,6 @@ server_accept(ServerSock, ServerNode, WorkerNode) ->
 server_handle(Sock, WorkerNode) ->
   {ok, Bin} = do_recv(Sock, []),
   if WorkerNode =/= false ->
-    io:format("Ping worker ~p: ~p~n", [WorkerNode, net_adm:ping(WorkerNode)]),
-    io:format("Reloading code: ~p (~p)~n", [[c:nl(rudy), c:nl(http)], nodes()]),
     spawn(WorkerNode, rudy, server_parse, [self(), Bin]);
   true ->
     spawn(rudy, server_parse, [self(), Bin])
