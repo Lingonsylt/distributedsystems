@@ -6,9 +6,13 @@
 -export([prac/0]).
 
 prac() ->
-  io:format("result: ~p~n", [isendofrequest(<<"sadsad">>)]),
-  io:format("result: ~p~n", [isendofrequest(<<"sadsad\r\n\r\n">>)]),
-  io:format("result: ~p~n", [merge([4,6,3,5,2,1])]).
+  io:format("~p~n", [http:parse_request(http:get("/hello/asd.txt?key=value&key2=value2"))]),
+  io:format("~p~n", [http:parse_request(http:get("/hello/asd.txt"))]),
+  io:format("~p~n", [http:parse_request(http:get("/hello/asd.txt?key"))]),
+  io:format("~p~n", [http:parse_request(http:get("/hello/asd.txt?key="))]).
+  % io:format("result: ~p~n", [isendofrequest(<<"sadsad">>)]),
+  % io:format("result: ~p~n", [isendofrequest(<<"sadsad\r\n\r\n">>)]),
+  % io:format("result: ~p~n", [merge([4,6,3,5,2,1])]).
 
 isendofrequest(Bin) ->
   isendofrequest_(binary:list_to_bin(lists:reverse(binary:bin_to_list(Bin)))).

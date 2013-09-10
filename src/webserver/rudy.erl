@@ -69,11 +69,18 @@ server_handle(Sock, WorkerNode) ->
 server_parse(Pid, Data) ->
   RequestData = binary_to_list(Data),
   Request = http:parse_request(RequestData),
-  timer:sleep(40),
   Pid ! {response, reply(Request)}.
 
-reply({{get, URI, _}, _, _}) ->
-  http:ok("Hello erlang!").
+reply({{get, {URL, Args}, _}, _, _}) ->
+  [_|LocalURL] = URL,
+  case file:read_file(LocalURL) of
+    {ok, Binary} ->
+      http:ok(Binary);
+    {error, enoent} ->
+      http:not_found(URL ++ " was not found");
+    {error, _} ->
+      http:internal_server_error()
+  end.
 
 do_recv(Sock, ReceivedData) ->
   if byte_size(ReceivedData) >= 4 ->
