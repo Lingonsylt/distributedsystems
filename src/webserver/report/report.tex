@@ -1,0 +1,115 @@
+% Very simple template for lab reports. Most common packages are already included.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} % Change according your file encoding
+\usepackage{graphicx}
+\usepackage{url}
+
+%opening
+\title{Report 1: Rudy}
+\author{Anton Blomberg}
+\date{\today{}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\textit{Learning erlang by implementing a webserver and discussing the opportunities
+for enhancement using distributed techniques.}
+
+A webserver is a classic example of an application that handles a large number of similar but independent problems.
+This is a type of problem where a distributed design can be suitable.
+
+\section{Main problems and solutions}
+
+\textit{The main problem of a webserver is that many clients could be sending requests at the same time
+and expect to be responded to in a timely fashion. The focus of this experiment is to find out how
+Erlang can be used to solve this problem compared to other environments, and how it could be used to make
+the solution distributed.}
+
+A naive webserver would have a loop that executes the following steps in order:
+\begin{enumerate}
+  \item Listen for a new connection
+  \item Accept a new connection
+  \item Receive and parse the a request
+  \item Generate a response based on the request
+  \item Return the response and close the connection
+  \item Go to step 2
+\end{enumerate}
+
+The main problem is that during steps 3-5 the server will be unresponsive to new requests.
+ Based on the work done by the application in step 4 this can take some time.
+
+The simple approach in programming to this is to run each request-response (step 3-5) in
+a new thread, letting the main thread go to step 2 and accept new connections as quickly as possible.
+
+The problem that then arises is that for a large number of concurrent requests, there won't be enough
+memory to keep the stacks for all threads and that the CPU scheduler will spend a lot of time
+on scheduling threads that wait for IO.
+This can be mitigated by reusing a number of threads in a thread pool, but will not solve the problem
+with all new pending connections waiting to be accepted.
+
+By using Erlang, the same problem can be solved in a different way and without much extra work make
+ the solution distributed.
+Instead of spawning a new OS-level thread for each request an Erlang process can be used. An Elang process
+is a "lightweight" or "green" thread that isn't scheduled by the OS-scheduler and doesn't need a stack
+ of its own. This allows for creating millions of simultaneously running "threads" without the
+  huge amount of memory and scheduling overhead required for threads in other popular languages.
+
+Since Erlang is also based on the Actor model for inter-process communication no thread locks, semaphores
+or mutexes is needed. This ensures that the programmer doesn't by mistake create situations where locking
+ slows down the execution of the concurrent system. The message-passing approach in the Actor model
+ also creates a great opportunity for making a system distributed without introducing more complexity.
+
+\section{Evaluation}
+
+\textit{Five different benchmark cases has been evaluated. These are a mix of using/not using multiprocessing and
+running server and workers on different EVMs (Erlang Virtual Machines), both locally and remotely.}
+
+The base benchmark is a no multiprocess server running in one EVM. The configuration is changed by running the worker
+processes (the processes parsing and responding to requests) and the server (the process that accepts new requests) on
+ different EVMs, both on the local machine and on a remote machine.
+
+\begin{description}
+  \item[Case 1.] No multiprocess, 5 concurrent requests
+  \item[Case 2.] Multiprocess, server and workers on supervisor EVM, 50 concurrent requests
+  \item[Case 3.] Multiprocess, server on supervisor EVM, workers on other EVM, 50 concurrent requests
+  \item[Case 4.] Multiprocess, server on other EVM, workers on third EVM, 50 concurrent requests
+  \item[Case 5.] Multiprocess, server on supervisor EVM, workers om remote host EVM, 5 concurrent requests
+\end{description}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+Benchmark case & Mean time & Median time & 95\% served under & Concurrency level\\\hline
+Case 1 & 205 & 205 & 206 & 5\\\hline
+Case 2 & 78 & 42 & 51 & 50\\\hline
+Case 3 & 69 & 43 & 53 & 50\\\hline
+Case 4 & 80 & 43 & 58 & 50\\\hline
+Case 5 & 54 & 51 & 59 & 5\\\hline
+\end{tabular}
+\caption{Benchmark results for different configurations}
+\label{tab:results}
+\end{table}
+
+\section{Conclusions}
+
+As expected the synchronous single process version is considerably slower and also handles a much lower concurrency. The
+median time per request is 205 ms compared to around 43 ms for the multiprocess implementations. The concurrency level
+before the server becomes unstable is also much lower, where a above 5 concurrent requests makes the server unstable
+and it starts dropping requests. Compared to the multiprocess configurations where 50 concurrent requests is stable
+and around 100 is the point where it becomes unstable.
+
+There is a hardly noticeable overhead in running the server or workers on another EVM than the supervisor on the same
+machine. This shows that concurrency where network latency is not a problem is a very real possibility.
+When running the worker processes on a remote machine a small increase in median time can be seen compared to the other
+ multiprocess configurations but also a lower mean. The lower mean can be explained by the fact that the concurrency
+  level is very much lower than the other multiprocess configurations, at 5 concurrent requests before it becomes unstable.
+  This could be because of the remote machines performance or network characteristics.
+
+This was a very useful exercise and I learnt a lot about Erlang and its actor-system. I have written a couple of
+web servers in other languages before this, and also worked with web development quite a lot. So the different
+implementations and their performance characteristics did not come as a surprise.
+
+\end{document}
