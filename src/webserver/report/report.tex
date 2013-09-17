@@ -70,6 +70,7 @@ running server and workers on different EVMs (Erlang Virtual Machines), both loc
 The base benchmark is a no multiprocess server running in one EVM. The configuration is changed by running the worker
 processes (the processes parsing and responding to requests) and the server (the process that accepts new requests) on
  different EVMs, both on the local machine and on a remote machine.
+ In each benchmark 1000 requests are made.
 
 \begin{description}
   \item[Case 1.] No multiprocess, 5 concurrent requests
@@ -89,7 +90,8 @@ Case 3 & 69 & 43 & 53 & 50\\\hline
 Case 4 & 80 & 43 & 58 & 50\\\hline
 Case 5 & 54 & 51 & 59 & 5\\\hline
 \end{tabular}
-\caption{Benchmark results for different configurations}
+\caption{Benchmark results for different configurations. Measured in milliseconds per request for Mean, Median and
+95\% served under and number of concurrent requests for Concurrency level}
 \label{tab:results}
 \end{table}
 
@@ -97,19 +99,20 @@ Case 5 & 54 & 51 & 59 & 5\\\hline
 
 As expected the synchronous single process version is considerably slower and also handles a much lower concurrency. The
 median time per request is 205 ms compared to around 43 ms for the multiprocess implementations. The concurrency level
-before the server becomes unstable is also much lower, where a above 5 concurrent requests makes the server unstable
+before the server becomes unstable is also much lower, where above 5 concurrent requests makes the server unstable
 and it starts dropping requests. Compared to the multiprocess configurations where 50 concurrent requests is stable
 and around 100 is the point where it becomes unstable.
 
 There is a hardly noticeable overhead in running the server or workers on another EVM than the supervisor on the same
 machine. This shows that concurrency where network latency is not a problem is a very real possibility.
+
 When running the worker processes on a remote machine a small increase in median time can be seen compared to the other
- multiprocess configurations but also a lower mean. The lower mean can be explained by the fact that the concurrency
-  level is very much lower than the other multiprocess configurations, at 5 concurrent requests before it becomes unstable.
-  This could be because of the remote machines performance or network characteristics.
+multiprocess configurations but also a lower mean. The lower mean can be explained by the fact that the concurrency
+level is very much lower than the other multiprocess configurations, at 5 concurrent requests before it becomes unstable.
+This could be because of the remote machines performance or network characteristics.
 
 This was a very useful exercise and I learnt a lot about Erlang and its actor-system. I have written a couple of
-web servers in other languages before this, and also worked with web development quite a lot. So the different
+web servers in other languages before this, and I have also worked with web development quite a lot. So the different
 implementations and their performance characteristics did not come as a surprise.
 
 \end{document}
