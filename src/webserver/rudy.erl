@@ -3,7 +3,7 @@
 -author("Anton Blomberg").
 
 %% API
--export([start/3,stop/0,run/1,server_handle/2,ver/0,server_start/3,server_parse/2]).
+-export([start/3,stop/0,run/1,server_handle/3,ver/0,server_start/4,server_parse/2]).
 
 run([PortString,WorkerNode,ServerNode|_]) ->
   start(list_to_integer(PortString), list_to_atom(WorkerNode), list_to_atom(ServerNode));
@@ -14,16 +14,29 @@ run([PortString|_]) ->
 
 
 start(Port, WorkerNode, ServerNode) ->
-  io:format("Spawning server on port: ~p (server: ~p, workers: ~p) ...~n", [Port, ServerNode, WorkerNode]),
-
-  if ServerNode =/= false ->
+  NoThreads = no_threads(),
+  io:format("Spawning server on port: ~p (server: ~p, workers: ~p, nothreads: ~p) ...~n", [Port, ServerNode, WorkerNode, NoThreads]),
+  if NoThreads ->
+    server_start(Port, ServerNode, WorkerNode, NoThreads);
+  ServerNode =/= false ->
     io:format("Ping server: ~p~n", [net_adm:ping(ServerNode)]),
     io:format("Reloading code: ~p (~p)~n", [[c:nl(rudy), c:nl(http)], nodes()]),
-    Server = spawn(ServerNode, rudy, server_start, [Port, ServerNode, WorkerNode]);
+    Server = spawn(ServerNode, rudy, server_start, [Port, ServerNode, WorkerNode, NoThreads]);
   true ->
-    Server = spawn(rudy, server_start, [Port, ServerNode, WorkerNode])
+    Server = spawn(rudy, server_start, [Port, ServerNode, WorkerNode, NoThreads])
   end,
   timer:sleep(infinity).
+
+no_threads([FirstArgument|T]) ->
+  if FirstArgument == "nothreads" ->
+    true;
+  true ->
+    false
+  end;
+no_threads(L) ->
+  false.
+no_threads() ->
+  no_threads(init:get_plain_arguments()).
 
 ver() ->
   "4".
@@ -31,7 +44,7 @@ ver() ->
 stop() ->
   exit(whereis(rudy), "time to die").
 
-server_start(Port, ServerNode, WorkerNode) ->
+server_start(Port, ServerNode, WorkerNode, NoThreads) ->
   if WorkerNode =/= false ->
     io:format("Ping worker ~p: ~p~n", [WorkerNode, net_adm:ping(WorkerNode)]),
     io:format("Reloading code: ~p (~p)~n", [[c:nl(rudy), c:nl(http)], nodes()]);
@@ -40,38 +53,54 @@ server_start(Port, ServerNode, WorkerNode) ->
   end,
   {ok, ServerSock} = gen_tcp:listen(Port, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]),
   io:format("Listening for connections on ~p...~n", [Port]),
-  server_accept(ServerSock, ServerNode, WorkerNode).
+  server_accept(ServerSock, ServerNode, WorkerNode, NoThreads).
 
-server_accept(ServerSock, ServerNode, WorkerNode) ->
+server_accept(ServerSock, ServerNode, WorkerNode, NoThreads) ->
   {ok, Sock} = gen_tcp:accept(ServerSock),
-  if ServerNode =/= false ->
-    Accepter = spawn(ServerNode, rudy, server_handle, [Sock,WorkerNode]);
+  if NoThreads ->
+    server_handle(Sock,WorkerNode, NoThreads);
+  ServerNode =/= false ->
+    Accepter = spawn(ServerNode, rudy, server_handle, [Sock,WorkerNode,NoThreads]);
   true ->
-    Accepter = spawn(rudy, server_handle, [Sock, WorkerNode])
+    Accepter = spawn(rudy, server_handle, [Sock, WorkerNode, NoThreads])
   end,
 
-  server_accept(ServerSock, ServerNode, WorkerNode).
+  server_accept(ServerSock, ServerNode, WorkerNode, NoThreads).
 
-server_handle(Sock, WorkerNode) ->
+server_handle(Sock, WorkerNode, NoThreads) ->
   {ok, Bin} = do_recv(Sock, []),
-  if WorkerNode =/= false ->
+  if NoThreads ->
+    Response = server_parse(false, Bin),
+    gen_tcp:send(Sock, Response),
+    ok = gen_tcp:close(Sock);
+  WorkerNode =/= false ->
     spawn(WorkerNode, rudy, server_parse, [self(), Bin]);
   true ->
     spawn(rudy, server_parse, [self(), Bin])
   end,
 
-  receive
-    {response, Data} ->
-      gen_tcp:send(Sock, Data),
-      ok = gen_tcp:close(Sock)
+  if not NoThreads ->
+    receive
+      {response, Data} ->
+        gen_tcp:send(Sock, Data),
+        ok = gen_tcp:close(Sock)
+    end;
+  true ->
+    true
   end.
 
 server_parse(Pid, Data) ->
   RequestData = binary_to_list(Data),
   Request = http:parse_request(RequestData),
-  Pid ! {response, reply(Request)}.
+  Response = reply(Request),
+  if Pid == false ->
+    Response;
+  true ->
+    Pid ! {response, Response}
+  end.
 
 reply({{get, {URL, Args}, _}, _, _}) ->
+  timer:sleep(40),
   [_|LocalURL] = URL,
   case file:read_file(LocalURL) of
     {ok, Binary} ->
