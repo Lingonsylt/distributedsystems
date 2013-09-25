@@ -1,0 +1,112 @@
+% Very simple template for lab reports. Most common packages are already included.
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc} % Change according your file encoding
+\usepackage{graphicx}
+\usepackage{url}
+
+%opening
+\title{Report 2: Routy}
+\author{Anton Blomberg}
+\date{\today{}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\textit{Implementing a software network router using the Link-state protocol}
+
+A router by itself is nothing but a piece of code standing at a halt. On the other hand, a network of interconnected
+routers is a good example of a distributed system. As long as each router follows the interface of the Link-state
+protocol each router can run it's own implementation. The code on each router runs independently and a network is formed
+by exchanging messages.
+A network with independently running processes make for a maintainable system since it will adapt itself to it's
+environment instead of relying on a predefined set of required resources or services. A router that doesn't expect or
+assume a specific state of other routers in a network can handle situations like network reconfiguration, link/router
+failure or other external factors.
+
+
+\section{Main problems and solutions}
+
+\textit{The main problem of creating a truly distributed system of independently running processes is verifying its
+correctness in the presence of concurrency and race conditions.}
+
+An error in a single procedure can be carried over the network and corrupting the state of another process which makes
+debugging and reasoning about the system hard. The link-state protocol offers a complete picture of the network which
+ makes this task easier by letting an observer verify the full state of each routers view of the network.
+Another problem present in networked systems is the possibility of failure, and the problem of detecting it. Through
+ Erlang processes can be monitored, but one can still not be 100\% sure about the state of a remote process not
+ answering.
+
+\pagebreak
+To verify the correctness of the system I had to create a test case simple enough to analyze, but complex enough to
+spot any errors. A simplified and not geographically correct map of Sweden was created, represented by a undirected
+graph like this:
+
+\begin{verbatim}
+Göteborg ------- Örebro
+    \                \------ Uppsala
+     \                          \
+      \---------- Lund           \
+                    \---------Stockholm
+\end{verbatim}
+
+This graph was created by creating interfaces in both directions between all connected cities like so:
+\begin{verbatim}
+stockholm ! {add, lund, {lund, 'sweden@lingon'}},
+  lund ! {add, stockholm, {stockholm, 'sweden@lingon'}},
+  ...
+\end{verbatim}
+
+The network was initialized by letting all routers broadcast their link-state messages and subsequently update their routing
+ tables.
+
+\section{Evaluation}
+
+\textit{In the graph described above a message have multiple possible routes between all cities.}
+The evaluation consisted of sending messages between certain routers and tracking the messages ways through the network.
+
+These are the messages sent:
+\begin{enumerate}
+  \item Stockholm -$>$ Göteborg
+  \item Göteborg -$>$ Stockholm
+  \item Örebro -$>$ Stockholm
+  \item Örebro -$>$ Lund
+\end{enumerate}
+
+This is the log from the test procedure:
+
+\begin{tiny}
+\begin{verbatim}
+Message 1:
+stockholm: routing message (hejfransthlm) from stockholm to goteborg through lund
+lund: routing message (hejfransthlm) from stockholm to goteborg through goteborg
+goteborg: received message hejfransthlm
+
+Message 2:
+goteborg: routing message (hejfrangbg) from goteborg to stockholm through lund
+lund: routing message (hejfrangbg) from goteborg to stockholm through stockholm
+stockholm: received message hejfrangbg
+
+Message 3:
+orebro: routing message (hejfranorebro) from orebro to stockholm through uppsala
+uppsala: routing message (hejfranorebro) from orebro to stockholm through stockholm
+stockholm: received message hejfranorebro
+
+Message 4:
+orebro: routing message (hejfranorebro) from orebro to lund through goteborg
+goteborg: routing message (hejfranorebro) from orebro to lund through lund
+lund: received message hejfranorebro
+\end{verbatim}
+\end{tiny}
+
+\section{Conclusions}
+
+\textit{All messages took the correct route.}
+According to the systems logging output, each message took the shortest route through the network to the correct host.
+The experiment is very limited in both sample size and complexity. To create a more realistic example, the network
+should consist of a larger number of routers, and more importantly investigate the impact of joining or leaving routers,
+configuration changes and undirected edges in the graph.
+
+\end{document}
