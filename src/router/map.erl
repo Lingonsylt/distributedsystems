@@ -1,5 +1,5 @@
 -module(map).
--export([update/3, reachable/2, all_nodes/1, test/0]).
+-export([update/3, reachable/2, all_nodes/1, new/0, test/0]).
 
 new() ->
   [].
@@ -8,7 +8,7 @@ update(Node, Links, Map) ->
   case lists:keyfind(Node, 1, Map) of
     false ->
       [{Node, Links}|Map];
-    Tuple ->
+    _ ->
       CleanedMap = lists:keydelete(Node, 1, Map),
       [{Node, Links}|CleanedMap]
   end.
@@ -24,16 +24,21 @@ reachable(Node, Map) ->
 all_nodes(Map) ->
   lists:foldl(
     fun({Node, Links}, Accum) ->
-      NewLinks = lists:filter(
-        fun(Link) ->
-          not lists:member(Link, Accum)
-        end, Links),
-      case lists:member(Node, Map) of
+      case lists:member(Node, Accum) of
         true ->
-          lists:append(NewLinks, Accum);
+          Accum1 = Accum;
         false ->
-          [Node|lists:append(NewLinks, Accum)]
-      end
+          Accum1 = [Node|Accum]
+      end,
+      lists:foldl(
+        fun(Link, LinkAccum) ->
+          case lists:member(Link, LinkAccum) of
+            true ->
+              LinkAccum;
+            false ->
+              [Link|LinkAccum]
+          end
+        end, Accum1, Links)
     end, [], Map).
 
 test() ->
