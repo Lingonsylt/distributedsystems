@@ -1,6 +1,7 @@
 -module(loggy).
 -export([start/1, stop/1]).
 start(Nodes) ->
+  register(error_checker, spawn(fun() -> run_error_check() end)),
   spawn_link(fun() ->init(Nodes) end).
 stop(Logger) ->
   Logger ! stop.
@@ -14,7 +15,7 @@ node_datas([Node|Nodes], NodeDatas) ->
 
 advance_time(CurrentTime, []) ->
   CurrentTime + 1;
-advance_time(CurrentTime, [{Node, {MaxTime, NodeData}}|NodeDatas]) ->
+advance_time(CurrentTime, [{_, {MaxTime, _}}|NodeDatas]) ->
   if MaxTime >= CurrentTime ->
     advance_time(CurrentTime, NodeDatas);
   true ->
@@ -24,7 +25,6 @@ advance_time(CurrentTime, [{Node, {MaxTime, NodeData}}|NodeDatas]) ->
 log_outstanding(_, [], NodeDatasAccum) ->
   NodeDatasAccum;
 log_outstanding(CurrentTime, [{Node, {MaxTime, Messages}}|NodeDatas], NodeDatasAccum) ->
-  % io:format("log_outstanding->NodeDatasAccum: ~p~n", [NodeDatasAccum]),
   log_outstanding(CurrentTime, NodeDatas, [{Node, {MaxTime, log_outstanding_messages(Node, CurrentTime, Messages, [])}}|NodeDatasAccum]).
 
 log_outstanding_messages(_, _, [], MessagesAccum) ->
@@ -40,21 +40,45 @@ log_outstanding_messages(Node, CurrentTime, [{Time, Message}|Messages], Messages
 
 loop(CurrentTime, NodeDatas) ->
   CurrentTime2 = advance_time(CurrentTime, NodeDatas),
-  % io:format("advance_time(~p, ~p)~n", [CurrentTime2, NodeDatas]),
   NodeDatas2 = log_outstanding(CurrentTime2, NodeDatas, []),
-  % io:format("log_outstanding(~p, ~p)~n", [CurrentTime2, NodeDatas2]),
   receive
     {log, From, Time, Message} ->
       NodeDatas3 = add_message(From, Time, Message, NodeDatas2),
-      % io:format("add_message(~p)~n", [NodeDatas3]),
-      % log(From, Time, Msg),
       loop(CurrentTime2, NodeDatas3);
     stop ->
-      ok                                                             2
+      ok
   end.
 
 log(From, Time, Msg) ->
-  io:format("log: ~w ~w ~p~n", [From, Time, Msg]).
+  io:format("log: ~w ~w ~p~n", [From, Time, Msg]),
+  error_checker ! {From, Time, Msg}.
+
+run_error_check() ->
+  run_error_check([]).
+
+run_error_check(Data) ->
+  receive
+    {From, Time, {received, {Msg,Id}}} ->
+      case error_check(Id, Data) of
+        {error, true} ->
+          io:format("ERROR: ~w ~w ~p received before it was sent!~n", [From, Time, {received, {Msg,Id}}]);
+        {error, false} ->
+          true
+      end,
+      run_error_check(Data);
+    {_, _, {sending, {_,Id}}} ->
+      run_error_check([Id|Data])
+  end.
+
+error_check(_, []) ->
+  {error, true};
+error_check(ReceivedId, [SentId|Data]) ->
+  case ReceivedId == SentId of
+    true ->
+      {error, false};
+    false ->
+      error_check(ReceivedId, Data)
+  end.
 
 get_max(Node, NodeData) ->
   case lists:keyfind(Node, 1, NodeData) of
@@ -62,14 +86,6 @@ get_max(Node, NodeData) ->
       0;
     {N, _} ->
       N
-  end.
-
-get_node(Node, NodeData) ->
-  case lists:keyfind(Node, 1, NodeData) of
-    false ->
-      0;
-    {Time, _} ->
-      Time
   end.
 
 add_message(Node, Time, Message, NodeDatas) ->
