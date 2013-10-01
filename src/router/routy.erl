@@ -99,12 +99,14 @@ router(Name, N, Hist, Intf, Table, Map) ->
       {ok, Ref} = intf:ref(Node, Intf),
       erlang:demonitor(Ref),
       Intf1 = intf:remove(Node, Intf),
-      router(Name, N, Hist, Intf1, Table, Map);
+      Map1 = map:update(Name, intf:list(Intf1), Map),
+      router(Name, N, Hist, Intf1, Table, Map1);
     {'DOWN', Ref, process, _, _} ->
       {ok, Down} = intf:name(Ref, Intf),
       io:format("~w: exit recived from ~w~n", [Name, Down]),
       Intf1 = intf:remove(Down, Intf),
-      router(Name, N, Hist, Intf1, Table, Map);
+      Map1 = map:update(Name, intf:list(Intf1), Map),
+      router(Name, N, Hist, Intf1, Table, Map1);
     {status, From} ->
       From ! {status, {Name, N, Hist, Intf, Table, Map}},
       router(Name, N, Hist, Intf, Table, Map);
