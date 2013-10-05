@@ -93,7 +93,6 @@ add_message(Node, Time, Message, NodeDatas) ->
     false ->
       error;
     {_, {OldMaxTime, OldNodeData}} ->
-      % io:format("{OldMaxTime: ~p, OldNodeData: ~p}~n", [OldMaxTime, OldNodeData]),
       NodeData2 = lists:keydelete(Node, 1, NodeDatas),
       case Time > get_max(Node, NodeData2) of
         true ->
