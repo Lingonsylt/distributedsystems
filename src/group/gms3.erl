@@ -16,10 +16,11 @@ start(Id) ->
   {ok, spawn_link(fun()-> init(Id, Self) end)}.
 
 init(Id, Master) ->
-  if (currentleader) ->
-    currentleader ! {new_leader, self()};
-  true ->
-    ok
+  case whereis(currentleader) of
+    undefined ->
+      ok;
+    _ ->
+      currentleader ! {new_leader, self()}
   end,
   leader(Id, Master, 0, [], [Master]).
 
@@ -107,10 +108,11 @@ election(Id, Master, N, Last, Slaves, [_|Group]) ->
       bcast(Id, Last, Rest),
       bcast(Id, {view, N, Slaves, Group}, Rest),
       Master ! {view, Group},
-      if (currentleader) ->
-        currentleader ! {new_leader, self()};
-        true ->
-          ok
+      case whereis(currentleader) of
+        undefined ->
+          ok;
+        _ ->
+          currentleader ! {new_leader, self()}
       end,
       leader(Id, Master, N+1, Rest, Group);
     [Leader|Rest] ->
