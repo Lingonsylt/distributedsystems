@@ -1,5 +1,5 @@
 -module(worker).
--export([start/5, start/2, run/0, run/1]).
+-export([start/5, start/2, run/0, run/1, test/0]).
 -define(change, 20).
 -define(color, {0,0,0}).
 
@@ -23,6 +23,37 @@ start_client(N, Leader) ->
       N2 = N - 1,
       start_client(N2, Leader)
   end.
+
+current_leader() ->
+  register(currentleader, spawn(
+    fun() ->
+      current_leader(noleaderyet) end)).
+
+current_leader(Leader) ->
+  receive
+    {new_leader, NewLeader} ->
+      current_leader(NewLeader);
+    {get_leader, Pid} ->
+      Pid ! {leader, Leader},
+      current_leader(Leader)
+  end.
+
+test() ->
+  current_leader(),
+  Leader = run(4),
+  timer:sleep(1500),
+  currentleader ! {get_leader, self()},
+  receive
+    {leader, Leader2} ->
+      start(5, Leader2),
+      timer:sleep(2000),
+      currentleader ! {get_leader, self()},
+      receive
+        {leader, Leader3} ->
+          start(6, Leader3)
+      end
+  end.
+
 
 start(Id, Leader)->
   start(Id, gms3, Id, Leader, 500).

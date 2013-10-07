@@ -16,6 +16,11 @@ start(Id) ->
   {ok, spawn_link(fun()-> init(Id, Self) end)}.
 
 init(Id, Master) ->
+  if (currentleader) ->
+    currentleader ! {new_leader, self()};
+  true ->
+    ok
+  end,
   leader(Id, Master, 0, [], [Master]).
 
 start(Id, Grp) ->
@@ -39,7 +44,7 @@ leader(Id, Master, N, Slaves, Group) ->
   receive
     {mcast, Msg} ->
       bcast(Id, {msg, N, Msg}, Slaves),
-      %io:format("gms ~w: received {mcast, ~w}~n", [Id, Msg]),
+      io:format("gms ~w: deliver msg ~p~w~n", [Id, N, Msg]),
       Master ! Msg,
       leader(Id, Master, N+1, Slaves, Group);
     {join, Wrk, Peer} ->
@@ -102,7 +107,12 @@ election(Id, Master, N, Last, Slaves, [_|Group]) ->
       bcast(Id, Last, Rest),
       bcast(Id, {view, N, Slaves, Group}, Rest),
       Master ! {view, Group},
-      leader(Id, Master, N, Rest, Group);
+      if (currentleader) ->
+        currentleader ! {new_leader, self()};
+        true ->
+          ok
+      end,
+      leader(Id, Master, N+1, Rest, Group);
     [Leader|Rest] ->
       erlang:monitor(process, Leader),
       slave(Id, Master, Leader, N, Last, Rest, Group)
