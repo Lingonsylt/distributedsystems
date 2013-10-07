@@ -1,16 +1,31 @@
 -module(worker).
--export([start/5, run/0]).
+-export([start/5, start/2, run/0, run/1]).
 -define(change, 20).
 -define(color, {0,0,0}).
 
-run() ->
-  start(1, gms2, 1, 500, {callhome, self()}),
-  receive
-    {hello, Cast} ->
-      start(2, gms2, 2, Cast, 500)
-  end,
-  timer:sleep(2000).
+run()->
+  run(2).
 
+run(N) ->
+  start(1, gms3, 1, 500, {callhome, self()}),
+  receive
+    {hello, Leader} ->
+      start_client(N-1, Leader),
+      Leader
+  end.
+
+start_client(N, Leader) ->
+  case N of
+    0 ->
+      ok;
+    _ ->
+      start(N+1, gms3, 1, Leader, 500),
+      N2 = N - 1,
+      start_client(N2, Leader)
+  end.
+
+start(Id, Leader)->
+  start(Id, gms3, Id, Leader, 500).
 
 start(Id, Module, Rnd, Sleep, {callhome, Pid}) ->
   spawn(fun() -> init(Id, Module, Rnd, Sleep, {callhome, Pid}) end);
