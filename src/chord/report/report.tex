@@ -20,6 +20,7 @@
 The Chord system is a distributed hash table based on a ring overlay and consistent hashing. Each node is connected to its successor in the
 ring and messages are passed along the ring until they reach their destination. Each node is responsible for storing a specific part of the
 hash keyspace based on the nodes identifier. The part of the keyspace is that between a certain node and its predecessor.
+\par
 In this implementation of Chord the routing and hashing is simplified to ease the implementation. In the original Chord paper routing is
 enhanced by keeping a list of "fingers", references to nodes further away in the ring. The other simplification in this implementation
 is that of using a numerical sequence as a keyspace instead of a hash-function, and using random number as keys.
@@ -27,25 +28,25 @@ is that of using a numerical sequence as a keyspace instead of a hash-function, 
 \section{Main problems and solutions}
 
 \textit{The main problems when running a Chord system is maintaining the ring, routing messages and storing data.}
-To maintain a ring new nodes joining must notify their successor that they want to take par of the successors responsibility. When joining
+To maintain a ring new nodes joining must notify their successor that they want to take part of the successors responsibility. When joining
 a node must first find its place in the ring by asking its successor about its predecessor, and changing successor, until it stabilizes
 in the right place. When stabilized the node must ask its successor for part of its stored keys to maintain the property of keyspace
 responsibility based on id.
+\par
 When adding a message one should be able to send the request to any node in the ring. Messages need to be routed through the ring until they
-reach the node responsible for handling the message. Messages are passed to successor until the key of the message is in between the id of
+reach the node responsible for handling the message. Messages are passed to the successor until the key of the message is in between the id of
 the node that received it and its predecessor. Each node stores keys and values in its defined range and gives away part of, or receives part
 of key ranges from other nodes when nodes join or leave.
-
+\par
 To handle the failure of nodes Chord nodes must monitor their predecessor and successor. But to enable the recovery from failure replication
 needs to be present to give the responsibility of the crashed node to another node.
-\end{verbatim}
 
 \section{Evaluation}
 
 \textit{Testing the simple Chord implementation.}
 To test the implementation I set up a test sequence with nodes joining and data being added interleaved. After the all nodes had joined I
 requested randomly chosen nodes for the keys inserted and verified that they were returned by the lookup-function.
-
+\par
 The interval of which the stabilize routing is being run affects the performance of the system when new nodes join or leave. If its very slow it
 will take some time before the new node arrives to the correct place in the ring. This time is also affected by the number of nodes in the ring.
 This can be mitigated by implementing the routing strategy described in the Chord paper where fingers point forward in the ring, giving O(log N) hops
@@ -57,4 +58,9 @@ to any location in the ring.
 The Chord system is very interesting and a good example of what can be achieved using knowledge about distributed systems. The consistent hashing
 approach is very efficient since no central server is needed to keep track of who is responsible for what. The automatically stabilizing ring
 overlay is a good example of a distributed system that is oblivious to nodes joining and leaving, with no requirement of a leader or central server.
+\par
+Chord is well suited for replication since the failover system already keeps track of the following nodes in the ring. An advantage of replication
+is that the performance can be increased due to more nodes being able to serve data in a hot-zone, letting an overloded node forward requests to
+replicas. The problem of hot-zones can be further mitigated by running muliple "virtual" nodes on each physical node, evening out the load because
+of the uniform hashing of the keys.
 \end{document}
