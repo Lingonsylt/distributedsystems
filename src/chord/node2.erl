@@ -1,4 +1,4 @@
--module(node1).
+-module(node2).
 -define(Timeout, 500).
 -define(Stabilize, 500).
 
