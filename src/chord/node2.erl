@@ -3,7 +3,7 @@
 -define(Stabilize, 500).
 
 %% API
--export([start/1, start/2, test/0]).
+-export([start/1, start/2, test/0, add_pair/3, lookup_key/2]).
 
 start(Id) ->
   start(Id, nil).
